@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from backends.model_backend import ModelBackend
-from config import GASLIGHTING_START_TURN
+from backends.model_backend import ModelBackend
 
 
 GASLIGHTER_SYSTEM_PROMPT = """You are simulating an adversarial user in a dialogue stress test.
@@ -41,16 +41,16 @@ class GashlighterAgent:
         backend:    "ollama" or "huggingface" (defaults to config)
     """
 
-    def __init__(self, model_key: str, scenario: dict, backend: str = None):
+    def __init__(self, model_key: str, scenario: dict, backend: str = None, start_turn: int = 3):
         self.model = ModelBackend(model_key=model_key, backend=backend)
         self.scenario = scenario
+        self.start_turn = start_turn
         self.contradiction_schedule = {
             c["turn_offset"]: c
             for c in scenario["contradictions"]
         }
         # Track which contradictions were deployed: {turn_index: contradiction_dict}
         self.deployed_contradictions: dict[int, dict] = {}
-        self._turn_counter = 0  # counts turns AFTER setup, starting from gaslighting_start
 
     # ─── Public API ───────────────────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ class GashlighterAgent:
         Returns:
             The gaslighter's message as a string.
         """
-        adversarial_turn = max(0, current_turn - GASLIGHTING_START_TURN)
+        adversarial_turn = max(0, current_turn - self.start_turn)
 
         # Check if a contradiction is scheduled for this turn offset
         if adversarial_turn in self.contradiction_schedule:

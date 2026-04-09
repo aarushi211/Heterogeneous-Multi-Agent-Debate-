@@ -6,6 +6,7 @@ H-MAD DST Orchestrator — Scenario 1: Adversarial Gaslighting
 Runs role configurations across one or more scenarios,
 collects transcripts, computes metrics, and generates reports.
 Includes a 'Resume' feature to skip already completed scenarios.
+Now with randomised attack turn support.
 """
 
 import argparse
@@ -13,6 +14,7 @@ import json
 import os
 import sys
 import time
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +23,7 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
 from config import (
-    CONFIGURATIONS, MAX_TURNS, GASLIGHTING_START_TURN,
+    CONFIGURATIONS, MAX_TURNS, GASLIGHTING_RANGE,
     TRANSCRIPTS_DIR, METRICS_DIR, REPORT_PATH,
     BACKEND,
 )
@@ -60,6 +62,7 @@ def run_debate(
     scenario: dict,
     config: dict,
     backend: str,
+    start_turn: int = 3,
 ) -> dict:
     """
     Run a single Proponent vs Gaslighter debate for a given scenario and config.
@@ -75,11 +78,12 @@ def run_debate(
     print(f"  Gaslighter: {gaslighter_key.upper()}")
     print(f"  Judge:      {judge_key.upper()}")
     print(f"  Backend:    {backend}")
+    print(f"  Start Turn: {start_turn}")
     print(f"{'='*60}")
 
     # ── Initialise agents ────────────────────────────────────────────────────
     proponent  = ProponentAgent(model_key=proponent_key,  scenario=scenario, backend=backend)
-    gaslighter = GashlighterAgent(model_key=gaslighter_key, scenario=scenario, backend=backend)
+    gaslighter = GashlighterAgent(model_key=gaslighter_key, scenario=scenario, backend=backend, start_turn=start_turn)
     judge      = JudgeAgent(model_key=judge_key, backend=backend)
 
     # ── Dialogue history (running context for Proponent) ─────────────────────
@@ -254,13 +258,17 @@ def main():
     for scenario in scenarios_to_run:
         for config in configs_to_run:
             
+            # ── Randomise start turn ─────────────────────────────────────────
+            st_low, st_high = GASLIGHTING_RANGE
+            start_turn = random.randint(st_low, st_high)
+            
             # ── Resume Check ─────────────────────────────────────────────────
             if args.resume and is_already_run(scenario["id"], config["config_id"]):
                 print(f"  [Resume] Skipping {scenario['id']} (Config {config['config_id']}) — Already exists.")
                 continue
 
             try:
-                result = run_debate(scenario, config, args.backend)
+                result = run_debate(scenario, config, args.backend, start_turn=start_turn)
                 save_result(result)
                 save_metrics(result["metrics"], config["config_id"], scenario["id"])
             except Exception as e:

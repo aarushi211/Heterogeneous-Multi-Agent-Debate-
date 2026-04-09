@@ -59,9 +59,9 @@ CONFIGURATIONS = [
 # Number of turns in each debate (Gaslighter gets a turn every 2 dialogue turns)
 MAX_TURNS = 10
 
-# At which turn does the Gaslighter introduce its first contradiction?
-# (0-indexed, so turn 3 = 4th message)
-GASLIGHTING_START_TURN = 3
+# At which turns can the Gaslighter introduce its first contradiction?
+# (0-indexed range, e.g., (2, 5) means it can start between turn 2 and 5)
+GASLIGHTING_RANGE = (2, 5)
 
 # ─── Output Paths ──────────────────────────────────────────────────────────────
 
