@@ -3,14 +3,9 @@ orchestrator.py
 
 H-MAD DST Orchestrator — Scenario 1: Adversarial Gaslighting
 
-Runs both role configurations (A and B) across one or more scenarios,
-collects transcripts, computes AHAR/TTD metrics, saves JSON results,
-and generates an HTML report.
-
-Usage:
-    python orchestrator.py
-    python orchestrator.py --scenario travel_budget
-    python orchestrator.py --dataset-file data/generated_scenarios.json --all-scenarios
+Runs role configurations across one or more scenarios,
+collects transcripts, computes metrics, and generates reports.
+Includes a 'Resume' feature to skip already completed scenarios.
 """
 
 import argparse
@@ -43,6 +38,20 @@ from report.generate_report import generate_html_report
 def ensure_dirs():
     for d in [TRANSCRIPTS_DIR, METRICS_DIR, "report"]:
         Path(d).mkdir(parents=True, exist_ok=True)
+
+
+# ─── File Path Helpers ────────────────────────────────────────────────────────
+
+def get_result_path(scenario_id: str, config_id: str) -> Path:
+    """Returns a fixed filename for a specific run to support resumption."""
+    return Path(TRANSCRIPTS_DIR) / f"{scenario_id}_config{config_id}.json"
+
+def get_metrics_path(scenario_id: str, config_id: str) -> Path:
+    return Path(METRICS_DIR) / f"metrics_{scenario_id}_config{config_id}.json"
+
+def is_already_run(scenario_id: str, config_id: str) -> bool:
+    """Check if results for this scenario/config already exist."""
+    return get_result_path(scenario_id, config_id).exists()
 
 
 # ─── Core Debate Loop ─────────────────────────────────────────────────────────
@@ -150,21 +159,37 @@ def run_debate(
     }
 
 
-# ─── Save Results ─────────────────────────────────────────────────────────────
+# ─── Save/Load Results ────────────────────────────────────────────────────────
 
 def save_result(result: dict) -> str:
-    fname = f"{result['scenario_id']}_config{result['config_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    path = Path(TRANSCRIPTS_DIR) / fname
+    path = get_result_path(result["scenario_id"], result["config_id"])
     with open(path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
     return str(path)
 
 def save_metrics(metrics: dict, config_id: str, scenario_id: str) -> str:
-    fname = f"metrics_{scenario_id}_config{config_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    path = Path(METRICS_DIR) / fname
+    path = get_metrics_path(scenario_id, config_id)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
     return str(path)
+
+def load_all_existing_results() -> list[dict]:
+    """Loads all transcripts from the transcripts folder to build a cumulative report."""
+    results = []
+    transcripts_path = Path(TRANSCRIPTS_DIR)
+    if not transcripts_path.exists():
+        return []
+        
+    for f in transcripts_path.glob("*.json"):
+        try:
+            with open(f, "r", encoding="utf-8") as f_in:
+                data = json.load(f_in)
+                # Basic validation that it's a result file
+                if "metrics" in data and "config_id" in data:
+                    results.append(data)
+        except Exception as e:
+            print(f"Warning: Could not load {f}: {e}")
+    return results
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
@@ -176,6 +201,8 @@ def main():
     parser.add_argument("--config", default="both", choices=["A", "B", "C", "both"])
     parser.add_argument("--all-scenarios", action="store_true")
     parser.add_argument("--dataset-file", type=str, default=None)
+    parser.add_argument("--resume", action="store_true", default=True, help="Skip already completed runs.")
+    parser.add_argument("--no-resume", action="store_false", dest="resume", help="Force re-run all scenarios.")
     args = parser.parse_args()
 
     # Colab check
@@ -215,28 +242,41 @@ def main():
     if args.config == "both":
         configs_to_run = [c for c in CONFIGURATIONS if c["config_id"] in ["A", "B"]]
     else:
+        # Check in current config file
         configs_to_run = [c for c in CONFIGURATIONS if c["config_id"] == args.config]
         if not configs_to_run:
-            # Maybe it's C or a custom one added
+            # Maybe it's a custom one added
             from config import CONFIGURATIONS as ALL_CONFIGS
             configs_to_run = [c for c in ALL_CONFIGS if c["config_id"] == args.config]
 
     print(f"\nRunning {len(scenarios_to_run)} scenarios across {len(configs_to_run)} configs.")
 
-    all_results = []
     for scenario in scenarios_to_run:
         for config in configs_to_run:
+            
+            # ── Resume Check ─────────────────────────────────────────────────
+            if args.resume and is_already_run(scenario["id"], config["config_id"]):
+                print(f"  [Resume] Skipping {scenario['id']} (Config {config['config_id']}) — Already exists.")
+                continue
+
             try:
                 result = run_debate(scenario, config, args.backend)
                 save_result(result)
                 save_metrics(result["metrics"], config["config_id"], scenario["id"])
-                all_results.append(result)
             except Exception as e:
                 print(f"Error running {scenario['id']} on config {config['config_id']}: {e}")
 
-    if all_results:
-        report_path = generate_html_report(all_results)
-        print(f"\nReport generated: {report_path}")
+    # ── Final Report Generation ──────────────────────────────────────────────
+    print(f"\n{'='*60}")
+    print("  Generating cumulative report...")
+    cumulative_results = load_all_existing_results()
+    if cumulative_results:
+        report_path = generate_html_report(cumulative_results)
+        print(f"  Update: Report contains {len(cumulative_results)} total runs.")
+        print(f"  Report generated: {report_path}")
+    else:
+        print("  Error: No results found to generate report.")
+    print(f"{'='*60}")
 
 if __name__ == "__main__":
     main()
