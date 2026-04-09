@@ -10,11 +10,7 @@ and generates an HTML report.
 Usage:
     python orchestrator.py
     python orchestrator.py --scenario travel_budget
-    python orchestrator.py --scenario project_deadline --backend ollama
-    python orchestrator.py --config A --scenario travel_budget  (run just one config)
-
-Environment:
-    export HF_API_TOKEN=hf_xxx   (required for HuggingFace backend)
+    python orchestrator.py --dataset-file data/generated_scenarios.json --all-scenarios
 """
 
 import argparse
@@ -58,13 +54,6 @@ def run_debate(
 ) -> dict:
     """
     Run a single Proponent vs Gaslighter debate for a given scenario and config.
-
-    Returns a result dict containing:
-      - transcript
-      - deployed_contradictions
-      - proponent_detection_turns
-      - judge_verdict
-      - metrics
     """
     config_id = config["config_id"]
     proponent_key  = config["proponent"]
@@ -85,7 +74,6 @@ def run_debate(
     judge      = JudgeAgent(model_key=judge_key, backend=backend)
 
     # ── Dialogue history (running context for Proponent) ─────────────────────
-    # Start from scenario setup turns — these establish the ground truth
     dialogue_history = list(scenario["setup_turns"])
     transcript = [
         {**msg, "turn": i, "phase": "setup"}
@@ -125,7 +113,6 @@ def run_debate(
         transcript.append({**assistant_entry, "turn": turn, "phase": "debate", "agent": "proponent"})
         turn += 1
 
-        # Small delay to avoid rate limiting on HF API
         if backend == "huggingface":
             time.sleep(1.5)
 
@@ -137,9 +124,7 @@ def run_debate(
         scenario=scenario,
         deployed_contradictions=deployed,
     )
-    print(f"  [Judge] DST Score: {judge_verdict.get('dst_score', 'N/A')}/10")
-    print(f"  [Judge] Reasoning: {judge_verdict.get('judge_reasoning', '')[:150]}")
-
+    
     # ── Metrics ───────────────────────────────────────────────────────────────
     from config import MODELS
     metrics = compute_all_metrics(
@@ -152,12 +137,6 @@ def run_debate(
         judge_model=MODELS[judge_key]["label"],
         scenario_id=scenario["id"],
     )
-
-    print(f"\n  ── Metrics Summary ──")
-    print(f"  AHAR (heuristic): {metrics['ahar_heuristic']:.0%}")
-    print(f"  AHAR (judge):     {metrics['ahar_judge']:.0%}")
-    print(f"  Detection Rate:   {metrics['detection_rate']:.0%}")
-    print(f"  Mean TTD:         {metrics['mean_ttd']}")
 
     return {
         "config_id": config_id,
@@ -174,116 +153,90 @@ def run_debate(
 # ─── Save Results ─────────────────────────────────────────────────────────────
 
 def save_result(result: dict) -> str:
-    """Save a single run result to JSON. Returns the file path."""
-    fname = (
-        f"{result['scenario_id']}_config{result['config_id']}_"
-        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    )
+    fname = f"{result['scenario_id']}_config{result['config_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     path = Path(TRANSCRIPTS_DIR) / fname
     with open(path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
-    print(f"\n  Transcript saved → {path}")
     return str(path)
-
 
 def save_metrics(metrics: dict, config_id: str, scenario_id: str) -> str:
     fname = f"metrics_{scenario_id}_config{config_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     path = Path(METRICS_DIR) / fname
     with open(path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
-    print(f"  Metrics saved    → {path}")
     return str(path)
 
 
 # ─── Main Entry Point ─────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="H-MAD DST Orchestrator — Scenario 1: Adversarial Gaslighting"
-    )
-    parser.add_argument(
-        "--scenario", default="travel_budget",
-        choices=list_scenarios(),
-        help=f"Which scenario to run. Available: {list_scenarios()}",
-    )
-    parser.add_argument(
-        "--backend", default=BACKEND,
-        choices=["ollama", "huggingface"],
-        help="Inference backend to use.",
-    )
-    parser.add_argument(
-        "--config", default="both",
-        choices=["A", "B", "both"],
-        help="Which configuration to run (A, B, or both).",
-    )
-    parser.add_argument(
-        "--all-scenarios", action="store_true",
-        help="Run all available scenarios.",
-    )
+    parser = argparse.ArgumentParser(description="H-MAD DST Orchestrator")
+    parser.add_argument("--scenario", default="travel_budget", help="Scenario ID to run.")
+    parser.add_argument("--backend", default=BACKEND, choices=["ollama", "huggingface"])
+    parser.add_argument("--config", default="both", choices=["A", "B", "C", "both"])
+    parser.add_argument("--all-scenarios", action="store_true")
+    parser.add_argument("--dataset-file", type=str, default=None)
     args = parser.parse_args()
+
+    # Colab check
+    try:
+        import google.colab
+        print("\n[!] Colab detected. Ensuring paths...")
+    except ImportError:
+        pass
 
     ensure_dirs()
 
-    # ── Select scenarios ──────────────────────────────────────────────────────
-    if args.all_scenarios:
-        scenarios_to_run = SCENARIOS
-    else:
-        scenarios_to_run = [get_scenario(args.scenario)]
+    # Load scenario pool
+    scenario_pool = list(SCENARIOS)
+    if args.dataset_file:
+        if not os.path.exists(args.dataset_file):
+            print(f"Error: {args.dataset_file} not found.")
+            sys.exit(1)
+        with open(args.dataset_file, "r", encoding="utf-8") as f:
+            extra = json.load(f)
+            scenario_pool.extend(extra)
+            print(f"Loaded {len(extra)} scenarios from {args.dataset_file}")
 
-    # ── Select configurations ─────────────────────────────────────────────────
+    def find_scenario(sid):
+        for s in scenario_pool:
+            if s["id"] == sid: return s
+        return None
+
+    if args.all_scenarios:
+        scenarios_to_run = scenario_pool
+    else:
+        s = find_scenario(args.scenario)
+        if not s:
+            print(f"Error: Scenario {args.scenario} not found. Available: {[s['id'] for s in scenario_pool]}")
+            sys.exit(1)
+        scenarios_to_run = [s]
+
     if args.config == "both":
-        configs_to_run = CONFIGURATIONS
+        configs_to_run = [c for c in CONFIGURATIONS if c["config_id"] in ["A", "B"]]
     else:
         configs_to_run = [c for c in CONFIGURATIONS if c["config_id"] == args.config]
+        if not configs_to_run:
+            # Maybe it's C or a custom one added
+            from config import CONFIGURATIONS as ALL_CONFIGS
+            configs_to_run = [c for c in ALL_CONFIGS if c["config_id"] == args.config]
 
-    print(f"\nH-MAD DST Experiment")
-    print(f"Scenarios: {[s['id'] for s in scenarios_to_run]}")
-    print(f"Configurations: {[c['config_id'] for c in configs_to_run]}")
-    print(f"Backend: {args.backend}")
-    print(f"Max turns per run: {MAX_TURNS}")
+    print(f"\nRunning {len(scenarios_to_run)} scenarios across {len(configs_to_run)} configs.")
 
     all_results = []
-    all_metrics = []
-
     for scenario in scenarios_to_run:
-        scenario_results = []
-        scenario_metrics = []
-
         for config in configs_to_run:
-            result = run_debate(
-                scenario=scenario,
-                config=config,
-                backend=args.backend,
-            )
-            save_result(result)
-            save_metrics(result["metrics"], config["config_id"], scenario["id"])
-            scenario_results.append(result)
-            scenario_metrics.append(result["metrics"])
+            try:
+                result = run_debate(scenario, config, args.backend)
+                save_result(result)
+                save_metrics(result["metrics"], config["config_id"], scenario["id"])
+                all_results.append(result)
+            except Exception as e:
+                print(f"Error running {scenario['id']} on config {config['config_id']}: {e}")
 
-        # ── Cross-configuration comparison (if both ran) ──────────────────────
-        if len(scenario_metrics) == 2:
-            comparison = compare_configurations(scenario_metrics[0], scenario_metrics[1])
-            print(f"\n  ── Config Comparison ({scenario['id']}) ──")
-            print(f"  {comparison['interpretation']}")
-
-            comp_path = Path(METRICS_DIR) / f"comparison_{scenario['id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(comp_path, "w") as f:
-                json.dump(comparison, f, indent=2)
-
-            for r in scenario_results:
-                r["comparison"] = comparison
-
-        all_results.extend(scenario_results)
-        all_metrics.extend(scenario_metrics)
-
-    # ── Generate HTML Report ──────────────────────────────────────────────────
-    print(f"\n{'='*60}")
-    print("  Generating HTML report...")
-    report_path = generate_html_report(all_results)
-    print(f"  Report → {report_path}")
-    print(f"{'='*60}")
-    print("\n  Done. Open the report in your browser to review results.")
-
+    if all_results:
+        report_path = generate_html_report(all_results)
+        print(f"\nReport generated: {report_path}")
 
 if __name__ == "__main__":
     main()

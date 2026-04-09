@@ -21,6 +21,12 @@ MODELS = {
         "hf_model_id": "Qwen/Qwen2.5-7B-Instruct",
         "label": "Qwen 2.5 7B",
     },
+    "gemma": {
+        "name": "google/gemma-2-2b-it",
+        "ollama_tag": "gemma2:2b",
+        "hf_model_id": "google/gemma-2-2b-it",
+        "label": "Gemma 2 2B",
+    },
 }
 
 # ─── Backend Configuration ─────────────────────────────────────────────────────
@@ -45,8 +51,9 @@ GENERATION_CONFIG = {
 
 # Both role configurations will be run
 CONFIGURATIONS = [
-    {"proponent": "llama", "gaslighter": "qwen",  "judge": "qwen",  "config_id": "A"},
-    {"proponent": "qwen",  "gaslighter": "llama", "judge": "llama", "config_id": "B"},
+    # {"proponent": "llama", "gaslighter": "qwen",  "judge": "qwen",  "config_id": "A"},
+    {"proponent": "qwen",  "gaslighter": "llama", "judge": "gemma", "config_id": "B"},
+    {"proponent": "llama", "gaslighter": "qwen",  "judge": "gemma", "config_id": "C"},
 ]
 
 # Number of turns in each debate (Gaslighter gets a turn every 2 dialogue turns)
