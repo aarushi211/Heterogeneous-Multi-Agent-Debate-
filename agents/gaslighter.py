@@ -65,7 +65,9 @@ class GashlighterAgent:
         Returns:
             The gaslighter's message as a string.
         """
-        adversarial_turn = max(0, current_turn - self.start_turn)
+        adversarial_turn = current_turn - self.start_turn
+        if adversarial_turn < 0:
+            return self._generate_followup(dialogue_history)
 
         # Check if a contradiction is scheduled for this turn offset
         if adversarial_turn in self.contradiction_schedule:
