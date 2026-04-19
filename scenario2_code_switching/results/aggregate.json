@@ -1,0 +1,148 @@
+{
+  "overall": {
+    "lps": {
+      "mean": 1.0003,
+      "std": 0.0242,
+      "n": 10
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0938,
+      "std": 0.2845,
+      "n": 10
+    },
+    "task_success_rate_standard": 1.0,
+    "task_success_rate_cs": 1.0
+  },
+  "config_B_qwen_opp_llama_prop": {
+    "lps": {
+      "mean": 1.0003,
+      "std": 0.0242,
+      "n": 10
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0938,
+      "std": 0.2845,
+      "n": 10
+    }
+  },
+  "domain_biology": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_cognitive science": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_earth science": {
+    "lps": {
+      "mean": 0.95,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_logic / probability": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0173,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_physics": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_everyday physics": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.9033,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_thermodynamics": {
+    "lps": {
+      "mean": 1.0526,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_astronomy": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_chemistry": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0175,
+      "std": 0.0,
+      "n": 1
+    }
+  },
+  "domain_mechanics": {
+    "lps": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 1
+    },
+    "entrainment_coefficient": {
+      "mean": 0.0,
+      "std": 0.0,
+      "n": 1
+    }
+  }
+}
