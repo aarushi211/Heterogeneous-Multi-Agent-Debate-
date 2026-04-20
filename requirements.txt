@@ -1,6 +1,0 @@
-requests>=2.31.0
-datasets>=2.14.0
-python-dotenv>=1.0.0
-# huggingface_hub is installed as a dependency of datasets, 
-# but including it explicitly is good practice.
-huggingface_hub>=0.16.0
