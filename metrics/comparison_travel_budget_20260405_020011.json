@@ -1,0 +1,10 @@
+{
+  "config_a_id": "A",
+  "config_b_id": "B",
+  "ahar_heuristic_delta": 0.0,
+  "ahar_judge_delta": 0.0,
+  "mean_ttd_delta": null,
+  "detection_rate_delta": 0.0,
+  "dst_score_delta": null,
+  "interpretation": "Lower AHAR (fewer hallucinations accepted): Qwen 2.5 7B as Proponent (0% vs 0%). Neither configuration detected any contradictions via heuristics."
+}
