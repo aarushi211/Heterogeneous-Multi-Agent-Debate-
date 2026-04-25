@@ -61,7 +61,7 @@ def is_already_run(scenario_id: str, config_id: str) -> bool:
 def run_debate(
     scenario: dict,
     config: dict,
-    backend: str,
+    debate_backend: str,
     start_turn: int = 3,
 ) -> dict:
     """
@@ -76,15 +76,15 @@ def run_debate(
     print(f"  Config {config_id} | Scenario: {scenario['id']}")
     print(f"  Proponent:  {proponent_key.upper()}")
     print(f"  Gaslighter: {gaslighter_key.upper()}")
-    print(f"  Judge:      {judge_key.upper()}")
-    print(f"  Backend:    {backend}")
+    print(f"  Judge:      {judge_key.upper()} (via Groq)")
+    print(f"  Debate Backend: {debate_backend}")
     print(f"  Start Turn: {start_turn}")
     print(f"{'='*60}")
 
     # ── Initialise agents ────────────────────────────────────────────────────
-    proponent  = ProponentAgent(model_key=proponent_key,  scenario=scenario, backend=backend)
-    gaslighter = GashlighterAgent(model_key=gaslighter_key, scenario=scenario, backend=backend, start_turn=start_turn)
-    judge      = JudgeAgent(model_key=judge_key, backend=backend)
+    proponent  = ProponentAgent(model_key=proponent_key,  scenario=scenario, backend=debate_backend)
+    gaslighter = GashlighterAgent(model_key=gaslighter_key, scenario=scenario, backend=debate_backend, start_turn=start_turn)
+    judge      = JudgeAgent(model_key=judge_key)  # Judge always uses Groq internally
 
     # ── Dialogue history (running context for Proponent) ─────────────────────
     dialogue_history = list(scenario["setup_turns"])
@@ -126,7 +126,7 @@ def run_debate(
         transcript.append({**assistant_entry, "turn": turn, "phase": "debate", "agent": "proponent"})
         turn += 1
 
-        if backend == "huggingface":
+        if debate_backend == "huggingface":
             time.sleep(1.5)
 
     # ── Judge evaluation ──────────────────────────────────────────────────────
@@ -201,8 +201,9 @@ def load_all_existing_results() -> list[dict]:
 def main():
     parser = argparse.ArgumentParser(description="H-MAD DST Orchestrator")
     parser.add_argument("--scenario", default="travel_budget", help="Scenario ID to run.")
-    parser.add_argument("--backend", default=BACKEND, choices=["ollama", "huggingface"])
-    parser.add_argument("--config", default="both", choices=["A", "B", "C", "both"])
+    parser.add_argument("--backend", default=BACKEND, choices=["ollama", "huggingface"],
+                        help="Backend for debate agents (Proponent & Gaslighter). Judge always uses Groq.")
+    parser.add_argument("--config", default="both", choices=["A", "B", "both"])
     parser.add_argument("--all-scenarios", action="store_true")
     parser.add_argument("--dataset-file", type=str, default=None)
     parser.add_argument("--resume", action="store_true", default=True, help="Skip already completed runs.")
@@ -268,7 +269,7 @@ def main():
                 continue
 
             try:
-                result = run_debate(scenario, config, args.backend, start_turn=start_turn)
+                result = run_debate(scenario, config, debate_backend=args.backend, start_turn=start_turn)
                 save_result(result)
                 save_metrics(result["metrics"], config["config_id"], scenario["id"])
             except Exception as e:

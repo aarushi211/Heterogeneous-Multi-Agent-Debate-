@@ -3,8 +3,11 @@ H-MAD DST Framework — Central Configuration
 Scenario 1: Adversarial Gaslighting / Dialogue State Tracking
 """
 
-from dataclasses import dataclass, field
+import os
 from typing import Literal
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─── Model Definitions ────────────────────────────────────────────────────────
 
@@ -13,31 +16,35 @@ MODELS = {
         "name": "meta-llama/Llama-3.1-8B-Instruct",
         "ollama_tag": "llama3.1:8b",
         "hf_model_id": "meta-llama/Llama-3.1-8B-Instruct",
-        "label": "Llama 3.1 8B",
+        "label": "Llama 3.1 8B (Q4)",
     },
     "qwen": {
         "name": "Qwen/Qwen2.5-7B-Instruct",
         "ollama_tag": "qwen2.5:7b",
         "hf_model_id": "Qwen/Qwen2.5-7B-Instruct",
-        "label": "Qwen 2.5 7B",
+        "label": "Qwen 2.5 7B (Q4)",
     },
-    "gemma": {
-        "name": "google/gemma-2-2b-it",
-        "ollama_tag": "gemma2:2b",
-        "hf_model_id": "google/gemma-2-2b-it",
-        "label": "Gemma 2 2B",
+    "gpt-oss": {
+        "name": "openai/gpt-oss-20b",
+        "groq_model_id": "openai/gpt-oss-20b",
+        "label": "GPT-oss 20B",
     },
 }
 
 # ─── Backend Configuration ─────────────────────────────────────────────────────
 
-BACKEND: Literal["ollama", "huggingface"] = "huggingface"
+# Default backend for debate agents (Proponent & Gaslighter)
+BACKEND: Literal["ollama", "huggingface"] = "ollama"
 
 OLLAMA_BASE_URL = "http://localhost:11434"
 
-# Set via environment variable HF_API_TOKEN, or fill in here (not recommended in VCS)
-HF_API_TOKEN = ""  # or os.environ.get("HF_API_TOKEN", "")
+# HuggingFace (kept for backward compatibility)
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
 HF_BASE_URL = "https://router.huggingface.co"
+
+# Groq (used for the Judge — GPT-oss-20B)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Inference params
 GENERATION_CONFIG = {
@@ -51,9 +58,8 @@ GENERATION_CONFIG = {
 
 # Both role configurations will be run
 CONFIGURATIONS = [
-    # {"proponent": "llama", "gaslighter": "qwen",  "judge": "qwen",  "config_id": "A"},
-    {"proponent": "qwen",  "gaslighter": "llama", "judge": "gemma", "config_id": "B"},
-    {"proponent": "llama", "gaslighter": "qwen",  "judge": "gemma", "config_id": "C"},
+    {"proponent": "llama", "gaslighter": "qwen",  "judge": "gpt-oss", "config_id": "A"},
+    {"proponent": "qwen",  "gaslighter": "llama", "judge": "gpt-oss", "config_id": "B"},
 ]
 
 # Number of turns in each debate (Gaslighter gets a turn every 2 dialogue turns)
