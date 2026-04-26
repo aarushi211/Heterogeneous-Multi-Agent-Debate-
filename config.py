@@ -103,7 +103,7 @@ MAX_TURNS = 10
 
 # At which turns can the Gaslighter introduce its first contradiction?
 # (0-indexed range, e.g., (2, 5) means it can start between turn 2 and 5)
-GASLIGHTING_RANGE = (2, 5)
+GASLIGHTING_RANGE = (4, 6)
 
 # ─── Output Paths ──────────────────────────────────────────────────────────────
 

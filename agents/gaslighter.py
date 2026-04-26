@@ -50,6 +50,8 @@ class GashlighterAgent:
         }
         # Track which contradictions were deployed: {turn_index: contradiction_dict}
         self.deployed_contradictions: dict[int, dict] = {}
+        min_start = len(scenario["setup_turns"])
+        self.start_turn = max(start_turn, min_start)
 
     # ─── Public API ───────────────────────────────────────────────────────────
 
