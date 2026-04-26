@@ -4,6 +4,7 @@ Scenario 1: Adversarial Gaslighting / Dialogue State Tracking
 """
 
 import os
+import threading
 from typing import Literal
 from dotenv import load_dotenv
 
@@ -43,8 +44,43 @@ HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
 HF_BASE_URL = "https://router.huggingface.co"
 
 # Groq (used for the Judge — GPT-oss-20B)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+# Supports multiple comma-separated keys for rate-limit rotation
+_raw_groq_keys = os.environ.get("GROQ_API_KEY", "")
+GROQ_API_KEYS = [k.strip() for k in _raw_groq_keys.split(",") if k.strip()]
+GROQ_API_KEY = GROQ_API_KEYS[0] if GROQ_API_KEYS else ""   # backward compat
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+
+class GroqKeyRotator:
+    """Thread-safe round-robin rotator for multiple Groq API keys."""
+
+    def __init__(self, keys: list[str]):
+        self._keys = keys
+        self._index = 0
+        self._lock = threading.Lock()
+
+    @property
+    def current_key(self) -> str:
+        if not self._keys:
+            raise EnvironmentError("No GROQ_API_KEYs configured.")
+        with self._lock:
+            return self._keys[self._index % len(self._keys)]
+
+    def rotate(self) -> str:
+        """Advance to the next key and return it."""
+        if len(self._keys) <= 1:
+            return self.current_key
+        with self._lock:
+            self._index = (self._index + 1) % len(self._keys)
+            new_key = self._keys[self._index]
+        print(f"   [GroqKeyRotator] Rotated to key …{new_key[-6:]}")
+        return new_key
+
+    def __len__(self):
+        return len(self._keys)
+
+
+groq_key_rotator = GroqKeyRotator(GROQ_API_KEYS)
 
 # Inference params
 GENERATION_CONFIG = {

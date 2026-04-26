@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import (
     BACKEND, MODELS,
     OLLAMA_BASE_URL, HF_BASE_URL, HF_API_TOKEN,
-    GROQ_API_KEY, GROQ_BASE_URL,
+    GROQ_API_KEY, GROQ_BASE_URL, groq_key_rotator,
     GENERATION_CONFIG,
 )
 
@@ -50,12 +50,12 @@ class ModelBackend:
                     "Set it in .env or export HF_API_TOKEN=<your_token>"
                 )
         if self.backend == "groq":
-            key = GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
-            if not key:
+            if len(groq_key_rotator) == 0:
                 raise EnvironmentError(
                     "GROQ_API_KEY is not set. "
                     "Set it in .env or export GROQ_API_KEY=<your_key>"
                 )
+            print(f"   [Groq] {len(groq_key_rotator)} API key(s) available for rotation.")
 
     # ─── Public API ───────────────────────────────────────────────────────────
 
@@ -113,15 +113,8 @@ class ModelBackend:
     # ─── Groq API ─────────────────────────────────────────────────────────────
 
     def _generate_groq(self, messages: list[dict]) -> str:
-        key = GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
         model_id = self.model_info.get("groq_model_id", self.model_info["name"])
-
         url = f"{GROQ_BASE_URL}/chat/completions"
-
-        headers = {
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-        }
 
         payload = {
             "model": model_id,
@@ -131,14 +124,29 @@ class ModelBackend:
             "top_p": GENERATION_CONFIG["top_p"],
         }
 
-        max_retries = 3
+        # Total attempts = retries_per_key × number_of_keys (at least 3)
+        num_keys = max(len(groq_key_rotator), 1)
+        retries_per_key = 2
+        max_retries = max(num_keys * retries_per_key, 3)
+
         for attempt in range(max_retries):
+            key = groq_key_rotator.current_key
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            }
+
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=120)
 
-                if resp.status_code == 429:
-                    wait = 10 * (attempt + 1)
-                    print(f"   [Groq] Rate limited, retrying in {wait}s...")
+                # 429 (Too Many Requests) or 423 (Locked / rate-limited)
+                if resp.status_code in (429, 423):
+                    groq_key_rotator.rotate()
+                    wait = 5 * (attempt + 1)
+                    print(
+                        f"   [Groq] Rate limited ({resp.status_code}) on attempt "
+                        f"{attempt+1}/{max_retries}, switching key & retrying in {wait}s..."
+                    )
                     time.sleep(wait)
                     continue
 
@@ -162,7 +170,7 @@ class ModelBackend:
                 error_msg = resp.text if 'resp' in locals() else 'N/A'
                 raise RuntimeError(f"Groq generation failed: {e}\nResponse: {error_msg}")
 
-        raise RuntimeError("Groq generation failed after all retries.")
+        raise RuntimeError("Groq generation failed after all retries (all keys exhausted).")
 
     # ─── HuggingFace Inference API ────────────────────────────────────────────
 

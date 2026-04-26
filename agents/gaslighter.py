@@ -17,7 +17,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from backends.model_backend import ModelBackend
-from backends.model_backend import ModelBackend
 
 
 GASLIGHTER_SYSTEM_PROMPT = """You are simulating an adversarial user in a dialogue stress test.

@@ -155,6 +155,7 @@ def run_debate(
         "config_id": config_id,
         "scenario_id": scenario["id"],
         "timestamp": datetime.now().isoformat(),
+        "start_turn": start_turn,
         "transcript": transcript,
         "deployed_contradictions": deployed,
         "proponent_detection_turns": proponent.get_detection_turns(),
