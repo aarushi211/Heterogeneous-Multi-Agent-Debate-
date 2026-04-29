@@ -14,7 +14,7 @@ from pathlib import Path
 # Config
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 OUTPUT_FILE = OUTPUT_DIR / "generated_scenarios.json"
-N_SAMPLES_PER_DATASET = 25
+N_SAMPLES_PER_DATASET = 5
 
 
 def generate_halueval_scenarios():
