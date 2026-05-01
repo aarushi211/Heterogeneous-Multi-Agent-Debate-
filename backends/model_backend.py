@@ -59,7 +59,7 @@ class ModelBackend:
 
     # ─── Public API ───────────────────────────────────────────────────────────
 
-    def generate(self, messages: list[dict], system_prompt: Optional[str] = None) -> str:
+    def generate(self, messages: list[dict], system_prompt: Optional[str] = None, max_tokens: Optional[int] = None) -> str:
         """
         Generate a response from the model.
 
@@ -77,15 +77,15 @@ class ModelBackend:
             full_messages = messages
 
         if self.backend == "ollama":
-            return self._generate_ollama(full_messages)
+            return self._generate_ollama(full_messages, max_tokens)
         elif self.backend == "groq":
-            return self._generate_groq(full_messages)
+            return self._generate_groq(full_messages, max_tokens)
         else:
-            return self._generate_hf(full_messages)
+            return self._generate_hf(full_messages, max_tokens)
 
     # ─── Ollama ───────────────────────────────────────────────────────────────
 
-    def _generate_ollama(self, messages: list[dict]) -> str:
+    def _generate_ollama(self, messages: list[dict], max_tokens: Optional[int] = None) -> str:
         url = f"{OLLAMA_BASE_URL}/api/chat"
         payload = {
             "model": self.model_info["ollama_tag"],
@@ -94,7 +94,7 @@ class ModelBackend:
             "options": {
                 "temperature": GENERATION_CONFIG["temperature"],
                 "top_p": GENERATION_CONFIG["top_p"],
-                "num_predict": GENERATION_CONFIG["max_new_tokens"],
+                "num_predict": max_tokens or GENERATION_CONFIG["max_new_tokens"],
             },
         }
         try:
@@ -112,14 +112,14 @@ class ModelBackend:
 
     # ─── Groq API ─────────────────────────────────────────────────────────────
 
-    def _generate_groq(self, messages: list[dict]) -> str:
+    def _generate_groq(self, messages: list[dict], max_tokens: Optional[int] = None) -> str:
         model_id = self.model_info.get("groq_model_id", self.model_info["name"])
         url = f"{GROQ_BASE_URL}/chat/completions"
 
         payload = {
             "model": model_id,
             "messages": messages,
-            "max_tokens": GENERATION_CONFIG["max_new_tokens"],
+            "max_tokens": max_tokens or GENERATION_CONFIG["max_new_tokens"],
             "temperature": GENERATION_CONFIG["temperature"],
             "top_p": GENERATION_CONFIG["top_p"],
         }
@@ -174,7 +174,7 @@ class ModelBackend:
 
     # ─── HuggingFace Inference API ────────────────────────────────────────────
 
-    def _generate_hf(self, messages: list[dict]) -> str:
+    def _generate_hf(self, messages: list[dict], max_tokens: Optional[int] = None) -> str:
         token = HF_API_TOKEN or os.environ.get("HF_API_TOKEN", "")
         model_id = self.model_info["hf_model_id"]
 
@@ -190,7 +190,7 @@ class ModelBackend:
         payload = {
             "model": model_id,
             "messages": messages,
-            "max_tokens": GENERATION_CONFIG["max_new_tokens"],
+            "max_tokens": max_tokens or GENERATION_CONFIG["max_new_tokens"],
             "temperature": GENERATION_CONFIG["temperature"],
             "top_p": GENERATION_CONFIG["top_p"],
         }

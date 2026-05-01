@@ -133,6 +133,7 @@ class JudgeAgent:
             raw_response = self.model.generate(
                 messages=messages,
                 system_prompt=JUDGE_SYSTEM_PROMPT,
+                max_tokens=2048,
             )
 
             verdict = self._parse_verdict(raw_response)
